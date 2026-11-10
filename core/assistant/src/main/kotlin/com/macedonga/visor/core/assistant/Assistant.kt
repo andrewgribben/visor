@@ -782,6 +782,18 @@ class Assistant(
                 say("Remote interaction complete ${deep(fields)}")
                 liveAi.end("the glasses completed the interaction")
             }
+            // The glasses answered a command themselves (a timer, the volume) and wait for the server to end the turn;
+            // unended, they sit out the whole processing wait. Ended here when Visor never had the turn.
+            EV_TTS_REQUEST -> {
+                val f = runCatching { Thrift.loads(event.body) }.getOrDefault(emptyMap())
+                val id = f[2].asText()
+                say("${eventName(event.id)} (${event.id}), ${event.body.size} bytes ${describe(event.body)}")
+                if (f[8].asText() == "hatch_async" && id.isNotEmpty() && id !in l.claimed && id !in l.answered && id !in l.closed) {
+                    l.answered.add(id)
+                    sendNetEvent(l, m0, voiceComplete(id, "", listen = false, card = null))
+                    say("Ended $id, which the glasses answered themselves")
+                }
+            }
             EV_FRAME_KEEP_ALIVE_RESPONSE, EV_KEEP_MWA_ALIVE -> Unit
             // The answer's display action, passed on to the phone; the glasses wait for the phone to take it.
             EV_ACTION_FULFILLMENT_REQUEST -> {

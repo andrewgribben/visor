@@ -41,6 +41,8 @@ internal const val MT_ENVELOPE = 9000
 internal const val MT_ENVELOPE_ACK = 9001
 
 // NetEvent ids, as the glasses' EventId table names them (events.tsv).
+// The glasses speaking a line themselves (field 1 the words, 2 the interaction, 8 who wrote it).
+internal const val EV_TTS_REQUEST = 15
 internal const val EV_FINAL_TRANSCRIPTION = 52
 internal const val EV_VOICE_ACTION_RESPONSE = 53
 internal const val EV_ACTION_FULFILLMENT_REQUEST = 55
