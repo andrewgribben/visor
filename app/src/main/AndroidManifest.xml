@@ -39,6 +39,8 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- The glasses' microphone for the assistant and the custom wake word; the phone's while the Meta AI mic is held. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Starts and stops the Claude subscription bridge in Termux, which must allow external apps. -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
@@ -47,6 +49,7 @@
 
     <!-- Speech recognisers and voices, and the SMS, media, map and music apps the glasses use. -->
     <queries>
+        <package android:name="com.termux" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>

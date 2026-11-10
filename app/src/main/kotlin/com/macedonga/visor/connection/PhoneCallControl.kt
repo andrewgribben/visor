@@ -84,6 +84,13 @@ class PhoneCallControl @Inject constructor(
         send("calls://outgoing/$provider", reply, mux, MT_OUTGOING_CALL_RESPONSE, body, error ?: "call started", failed = result != RESULT_OK)
     }
 
+    /** Places a call to [number] through [provider] (native line or WhatsApp), for the assistant's call tool: null when it started, else why not. */
+    fun startCall(provider: Int, number: String): String? = when (provider) {
+        GlassesNotification.PROVIDER_NATIVE -> placeCall(number).second
+        GlassesNotification.PROVIDER_WHATSAPP -> startWhatsApp(number).second
+        else -> "Calls on this provider are not supported"
+    }
+
     /** Telecom takes the call; the call itself rides HFP to the glasses. */
     @SuppressLint("MissingPermission") // checked with allows(), and a refusal is caught
     private fun placeCall(number: String): Pair<Long, String?> {

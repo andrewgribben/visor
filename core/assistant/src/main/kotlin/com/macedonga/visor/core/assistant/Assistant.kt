@@ -1121,10 +1121,44 @@ class Assistant(
             intent in MEDIA_CONTROLS -> scope.launch { mediaControl(l, interaction, transcript, MEDIA_CONTROLS.getValue(intent)) }
             else -> {
                 // A question that names an app goes to the app, not the model. A partner turn keeps Meta's own flow.
-                val claim = if (interaction in l.partnerTurns) null else apps.claim(transcript)
-                if (claim != null) scope.launch { appAnswer(l, interaction, transcript, intent, claim) }
+                val haCommand = if (interaction in l.partnerTurns) null else haRouted(transcript)
+                val claim = if (haCommand != null || interaction in l.partnerTurns) null else apps.claim(transcript)
+                if (haCommand != null) scope.launch { haAnswer(l, interaction, transcript, haCommand) }
+                else if (claim != null) scope.launch { appAnswer(l, interaction, transcript, intent, claim) }
                 else scope.launch { answer(l, interaction, transcript, visual, glasses) }
             }
+        }
+    }
+
+    /** The command after "ask/tell Home Assistant (to)" at the start of [transcript], or null when it is not that or Home Assistant is not set up. */
+    private fun haRouted(transcript: String): String? {
+        if (!store.config.value.hasHa) return null
+        val match = HA_ROUTE.find(withoutWakeWord(transcript)) ?: return null
+        return withoutWakeWord(transcript).substring(match.range.last + 1).trim().ifEmpty { null }
+    }
+
+    /** [command] answered by Home Assistant's own Assist agent, spoken as this interaction's answer. */
+    private suspend fun haAnswer(l: Link, interaction: String, transcript: String, command: String) {
+        if (!awaitPartnerWake(l, interaction)) return
+        val started = System.currentTimeMillis()
+        record(TurnRecord(interaction, started, transcript))
+        say("Home Assistant answers $interaction")
+        setPhase(l, AssistantPhase.THINKING)
+        val c = store.config.value
+        val reply = haConverse(c.haUrl, c.haToken, command, spoken(l).language)
+        val ok = reply.failure == null
+        val text = if (ok) reply.text else "Home Assistant did not answer: ${reply.failure}"
+        val actions = listOf(ToolAction("Home Assistant", command, ok, kind = "home_assistant", subject = command))
+        update(interaction) { it.copy(answer = text, modelMs = System.currentTimeMillis() - started, actions = actions) }
+        try {
+            val sentMs = deliver(l, interaction, transcript, text)
+            l.answered.add(interaction)
+            update(interaction) { it.copy(sentMs = sentMs) }
+        } catch (error: Exception) {
+            say("Home Assistant's answer did not reach the glasses: ${error.message}")
+            update(interaction) { it.copy(problem = error.why()) }
+        } finally {
+            setPhase(l, AssistantPhase.LISTENING)
         }
     }
 
@@ -1897,6 +1931,8 @@ class Assistant(
             "^((hey|hi|ehi|ei|ok|okay)?[ ,]*(meta|mata|metta|matta|meda)|(хей|хэй|хай|эй)([ ,]+(мета|мэта|метта|мэтта|это|вета))?|мета|мэта|метта|мэтта|вета|всем[ ,]+это)[ ,.!?]+",
             RegexOption.IGNORE_CASE,
         )
+        // "ask/tell Home Assistant (to) ..." at the start of a question, sent straight to it without the model.
+        val HA_ROUTE = Regex("""^(?:ask|tell)\s+home\s+assistant\b(?:\s+to\b)?[,:]?\s*""", RegexOption.IGNORE_CASE)
         const val MIN_MODEL_MS = 6_000L
         const val PHOTO_WAIT_MS = 8_000L
         // Then the phone's engine speaks instead.

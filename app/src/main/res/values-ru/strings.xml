@@ -626,6 +626,12 @@
     <string name="ai_key">API-ключ</string>
     <string name="ai_provider_other">Другой</string>
     <string name="ai_provider_chatgpt_sub">Ваш план Plus или Pro</string>
+    <string name="ai_bridge">Мост</string>
+    <string name="ai_bridge_start">Запустить</string>
+    <string name="ai_bridge_stop">Остановить</string>
+    <string name="ai_bridge_up">Работает в Termux.</string>
+    <string name="ai_bridge_down">Не запущен. Claude отвечает, только пока он работает.</string>
+    <string name="ai_provider_claude_sub">Ваш план Pro или Max через Claude Code в Termux</string>
     <string name="ai_provider_openai_sub">API-ключ</string>
     <string name="ai_get_key">Получить ключ</string>
     <string name="ai_chatgpt_account">Аккаунт ChatGPT</string>
@@ -692,8 +698,15 @@
     <string name="ai_phase_listening">Слушаем «Hey Meta»…</string>
     <string name="ai_phase_thinking">Думаем…</string>
     <string name="ai_phase_speaking">Говорим через очки…</string>
+    <string name="ha_section">Home Assistant</string>
+    <string name="ha_url">Адрес сервера</string>
+    <string name="ha_token">Токен доступа</string>
+    <string name="ha_works">Подключено</string>
+    <string name="ha_refused">Токен отклонён</string>
+    <string name="ha_failed">Не удалось подключиться: %1$s</string>
     <string name="phone_directions">Маршрут до %1$s</string>
     <string name="phone_play">Воспроизвести %1$s</string>
+    <string name="phone_message">Сообщение для %1$s</string>
 
     <string name="notify_apps_title">Уведомления приложений</string>
     <string name="notify_apps_loading">Составляем список приложений…</string>

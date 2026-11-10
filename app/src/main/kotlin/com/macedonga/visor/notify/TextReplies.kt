@@ -12,25 +12,32 @@ import javax.inject.Singleton
 /** Each chat's reply action, by the thread the glasses answer with, while its notification is up. */
 @Singleton
 class TextReplies @Inject constructor() {
-    private val byThread = ConcurrentHashMap<String, Pair<String, Notification.Action>>()
+    private class Entry(val key: String, val action: Notification.Action, val provider: Int, val sender: String)
 
-    fun put(thread: String, key: String, action: Notification.Action) {
-        byThread[thread] = key to action
+    private val byThread = ConcurrentHashMap<String, Entry>()
+
+    fun put(thread: String, key: String, action: Notification.Action, provider: Int, sender: String) {
+        byThread[thread] = Entry(key, action, provider, sender)
     }
 
     /** The notification [key] is gone, and its reply with it. */
     fun remove(key: String) {
-        byThread.values.removeIf { it.first == key }
+        byThread.values.removeIf { it.key == key }
     }
 
     fun has(thread: String) = byThread.containsKey(thread)
 
     /** The reply action of the notification [key], while it is up. */
-    fun byKey(key: String): Notification.Action? = byThread.values.firstOrNull { it.first == key }?.second
+    fun byKey(key: String): Notification.Action? = byThread.values.firstOrNull { it.key == key }?.action
+
+    /** The thread and reply action of a conversation on [provider] whose sender is named [name], while it is up. */
+    fun findBySender(provider: Int, name: String): Pair<String, Notification.Action>? =
+        byThread.entries.firstOrNull { it.value.provider == provider && it.value.sender.equals(name, ignoreCase = true) }
+            ?.let { it.key to it.value.action }
 
     /** Sends [text] in [thread] through the app's reply; null when it went, else why not. */
     fun reply(context: Context, thread: String, text: String): String? {
-        val action = byThread[thread]?.second ?: return "No reply in that conversation"
+        val action = byThread[thread]?.action ?: return "No reply in that conversation"
         return send(context, action, text)
     }
 

@@ -600,6 +600,12 @@
     <string name="ai_key">Chiave API</string>
     <string name="ai_provider_other">Altro</string>
     <string name="ai_provider_chatgpt_sub">Il tuo piano Plus o Pro</string>
+    <string name="ai_bridge">Bridge</string>
+    <string name="ai_bridge_start">Avvia</string>
+    <string name="ai_bridge_stop">Ferma</string>
+    <string name="ai_bridge_up">Attivo in Termux.</string>
+    <string name="ai_bridge_down">Non attivo. Claude risponde solo mentre è attivo.</string>
+    <string name="ai_provider_claude_sub">Il tuo piano Pro o Max, tramite Claude Code in Termux</string>
     <string name="ai_provider_openai_sub">Chiave API</string>
     <string name="ai_get_key">Ottieni una chiave</string>
     <string name="ai_chatgpt_account">Account ChatGPT</string>
@@ -664,8 +670,15 @@
     <string name="ai_phase_listening">In ascolto di “Hey Meta”…</string>
     <string name="ai_phase_thinking">Sto pensando…</string>
     <string name="ai_phase_speaking">Parlo dagli occhiali…</string>
+    <string name="ha_section">Home Assistant</string>
+    <string name="ha_url">Indirizzo del server</string>
+    <string name="ha_token">Token di accesso</string>
+    <string name="ha_works">Connesso</string>
+    <string name="ha_refused">Il token è stato rifiutato</string>
+    <string name="ha_failed">Impossibile raggiungerlo: %1$s</string>
     <string name="phone_directions">Indicazioni per %1$s</string>
     <string name="phone_play">Riproduci %1$s</string>
+    <string name="phone_message">Messaggio a %1$s</string>
 
     <string name="notify_apps_title">Notifiche delle app</string>
     <string name="notify_apps_loading">Elenco le app…</string>
