@@ -117,8 +117,8 @@ internal class PhoneTools(private val phone: Phone) {
         ),
         Triple(
             "open_app",
-            "Open an app on the phone by its name, such as another assistant app, optionally sharing text into it " +
-                "(e.g. the wearer's question, for an app that takes a shared question). Opens it on the phone when " +
+            "Open an app on the phone by its name, only when the wearer asks to open or launch an app, optionally " +
+                "sharing text into it. Never use it to answer a question yourself. Opens it on the phone when " +
                 "Visor may and the phone is unlocked, else a notification waits for a tap. Say exactly what the tool result says.",
             schema(
                 "name" to text("The app's name, as installed on the phone, e.g. \"Claude\" or \"Spotify\"."),

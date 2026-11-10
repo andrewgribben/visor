@@ -1208,7 +1208,8 @@ class Assistant(
             record(TurnRecord(interaction, System.currentTimeMillis(), transcript))
             return speakTurn(l, interaction, transcript, "Tell the wearer that ${asked.label} is not set up in Visor.")
         }
-        answer(l, interaction, transcript, visual, glasses, configOverride = override)
+        // The question alone: with "ask Claude" left in, the model opened the Claude app instead of answering.
+        answer(l, interaction, askedQuestion(withoutWakeWord(transcript)), visual, glasses, configOverride = override)
     }
 
     /** [asked]'s own app, opened on the phone with the question shared into it, in place of an answer. */
