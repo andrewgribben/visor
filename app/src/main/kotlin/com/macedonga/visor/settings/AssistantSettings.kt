@@ -1,6 +1,7 @@
 package com.macedonga.visor.settings
 
 import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -109,7 +110,13 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
     }
 
     var check by remember { mutableStateOf<KeyCheck>(KeyCheck.None) }
-    LaunchedEffect(config.provider, config.apiKey, config.baseUrl, config.chatGpt) {
+    // The Claude subscription's bridge in Termux: a tick asks it again after Start or Stop.
+    var bridgeTick by remember { mutableStateOf(0) }
+    var bridgeNote by remember { mutableStateOf<String?>(null) }
+    var bridgeBusy by remember { mutableStateOf(false) }
+    var termux by remember { mutableStateOf(context.checkSelfPermission(TermuxBridge.PERMISSION) == PackageManager.PERMISSION_GRANTED) }
+    val askTermux = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { termux = it }
+    LaunchedEffect(config.provider, config.apiKey, config.baseUrl, config.chatGpt, bridgeTick) {
         if (!config.hasModel) {
             check = KeyCheck.None
             return@LaunchedEffect
@@ -170,6 +177,7 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
         onPauseOrDispose { }
     }
     val plan = config.provider == Provider.CHATGPT
+    val subscription = config.provider == Provider.CLAUDE_SUBSCRIPTION
     LaunchedEffect(plan, config.chatGpt, noteShown) {
         if (plan && config.chatGpt.isNotEmpty() && !noteShown) sheet = "plan_note"
     }
@@ -205,6 +213,36 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
                     } else null,
                     if (plan) row {
                         ChatGptRow(config.chatGpt, signIn, limited, check, onStart = model.chatGpt::start, onOpen = { sheet = "chatgpt" })
+                    } else if (subscription) row {
+                        val up = check is KeyCheck.Works
+                        RowFrame(
+                            stringResource(R.string.ai_bridge), onClick = null,
+                            sub = bridgeNote ?: stringResource(if (up) R.string.ai_bridge_up else R.string.ai_bridge_down),
+                            busy = bridgeBusy || check == KeyCheck.Checking,
+                        ) {
+                            if (!bridgeBusy) ActionPill(
+                                stringResource(if (!termux) R.string.allow else if (up) R.string.ai_bridge_stop else R.string.ai_bridge_start),
+                                {
+                                    if (!termux) askTermux.launch(TermuxBridge.PERMISSION) else {
+                                        val start = !up
+                                        bridgeNote = TermuxBridge.run(context, start)
+                                        if (bridgeNote == null) {
+                                            bridgeBusy = true
+                                            // Asks until the bridge answers (or stops answering), for up to 15 s.
+                                            scope.launch {
+                                                for (i in 1..20) {
+                                                    delay(750)
+                                                    if (runCatching { listModels(config) }.isSuccess == start) break
+                                                }
+                                                bridgeBusy = false
+                                                bridgeTick++
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                        }
                     } else row {
                         val (sub, problem) = keyWords(check)
                         // Without a key, the way to make one is on the row.
@@ -502,6 +540,7 @@ private fun providerName(p: Provider): String = if (p == Provider.OPENAI_COMPATI
 private fun providerDetail(p: Provider): String? = when (p) {
     Provider.CHATGPT -> stringResource(R.string.ai_provider_chatgpt_sub)
     Provider.OPENAI -> stringResource(R.string.ai_provider_openai_sub)
+    Provider.CLAUDE_SUBSCRIPTION -> stringResource(R.string.ai_provider_claude_sub)
     Provider.OPENAI_COMPATIBLE -> stringResource(R.string.ai_openai_compatible)
     else -> null
 }

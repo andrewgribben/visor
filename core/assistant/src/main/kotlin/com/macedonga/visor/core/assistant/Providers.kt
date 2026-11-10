@@ -34,6 +34,8 @@ enum class Provider(val title: String, val api: String, val keys: String, val se
     GROK("Grok", "https://api.x.ai/v1", "https://console.x.ai", WebSearch.RESPONSES),
     OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "https://openrouter.ai/settings/keys", WebSearch.OPENROUTER),
     GROQ("Groq", "https://api.groq.com/openai/v1", "https://console.groq.com/keys", WebSearch.GROQ),
+    // The person's Claude plan through Claude Code, served by bridge/bridge.js in Termux on this phone.
+    CLAUDE_SUBSCRIPTION("Claude subscription", "http://127.0.0.1:8080/v1", "", null, "haiku"),
     OPENAI_COMPATIBLE("", "", "", null);
 
     /** Answers come over Chat Completions (when they do not search). */

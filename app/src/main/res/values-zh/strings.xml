@@ -582,6 +582,12 @@
     <string name="ai_key">API 密钥</string>
     <string name="ai_provider_other">其他</string>
     <string name="ai_provider_chatgpt_sub">你的 Plus 或 Pro 套餐</string>
+    <string name="ai_bridge">桥接</string>
+    <string name="ai_bridge_start">启动</string>
+    <string name="ai_bridge_stop">停止</string>
+    <string name="ai_bridge_up">正在 Termux 中运行。</string>
+    <string name="ai_bridge_down">未运行。仅在其运行时 Claude 才会回答。</string>
+    <string name="ai_provider_claude_sub">你的 Pro 或 Max 套餐，通过 Termux 中的 Claude Code</string>
     <string name="ai_provider_openai_sub">API 密钥</string>
     <string name="ai_get_key">获取密钥</string>
     <string name="ai_chatgpt_account">ChatGPT 账号</string>
