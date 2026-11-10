@@ -85,7 +85,7 @@ class Timers(private val file: File) : Responder {
                 keep(kept.filterNot { it.id == tar.id } + tar)
                 connection.send(reply, result() + Wire.fieldBytes(2, tar.raw), messageType = MT_CREATE + 1)
                 note("Glasses created ${words(tar)}")
-                sync(connection)
+                sync(connection, reply)
             }
             MT_UPDATE -> {
                 val tar = Tar(f.bytes(1))
@@ -93,14 +93,14 @@ class Timers(private val file: File) : Responder {
                 if (known) keep(kept.map { if (it.id == tar.id) tar else it })
                 connection.send(reply, if (known) result() else failure(ERROR_UPDATE, "no such id"), messageType = MT_UPDATE + 1)
                 note("Glasses updated ${words(tar)}")
-                if (known) sync(connection)
+                if (known) sync(connection, reply)
             }
             MT_DELETE -> {
                 val gone = matching(Wire.parse(f.bytes(1)))
                 keep(kept - gone.toSet())
                 connection.send(reply, if (gone.isEmpty()) failure(ERROR_NO_MATCHES, "nothing matches") else result(), messageType = MT_DELETE + 1)
                 note("Glasses deleted ${gone.size}: ${gone.joinToString { words(it) }}")
-                if (gone.isNotEmpty()) sync(connection)
+                if (gone.isNotEmpty()) sync(connection, reply)
             }
             MT_QUERY -> {
                 val found = matching(Wire.parse(f.bytes(1)))
@@ -113,25 +113,26 @@ class Timers(private val file: File) : Responder {
                 val done = kept.filter { it.id == id && !it.repeats }
                 if (done.isNotEmpty()) {
                     keep(kept - done.toSet())
-                    sync(connection)
+                    sync(connection, reply)
                 }
                 note("Rang on the glasses: ${done.joinToString { words(it) }.ifEmpty { id }}")
             }
             MT_SYNC_ON_DEMAND -> {
                 connection.send(reply, result(), messageType = MT_SYNC_ON_DEMAND + 1)
-                sync(connection)
+                sync(connection, reply)
             }
             else -> note("message type ${message.info.messageType} not handled")
         }
     }
 
     /** The whole list to the glasses, without what has long rung. */
-    private suspend fun sync(connection: DataXConnection) {
+    // On the glasses' own channel: a channel the phone opens to 53210 finds no service on their side (0xC001).
+    private suspend fun sync(connection: DataXConnection, reply: Int) {
         val now = System.currentTimeMillis()
         keep(kept.filterNot { t -> t.completed || (t.fireAt != null && !t.repeats && t.fireAt < now - STALE_MS) })
         val body = kept.fold(ByteArray(0)) { acc, t -> acc + Wire.fieldBytes(1, t.raw) } +
             Wire.fieldString(2, UUID.randomUUID().toString())
-        connection.sendOnService(SVC_TAR, MT_SYNC_TO_GLASSES, body)
+        connection.send(reply, body, messageType = MT_SYNC_TO_GLASSES)
     }
 
     /** What a TARQuery picks out: by ids, else by type and title. */
