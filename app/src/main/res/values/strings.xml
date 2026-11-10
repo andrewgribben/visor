@@ -668,6 +668,12 @@
     <string name="ai_phase_listening">Listening for “Hey Meta”…</string>
     <string name="ai_phase_thinking">Thinking…</string>
     <string name="ai_phase_speaking">Speaking on the glasses…</string>
+    <string name="ha_section">Home Assistant</string>
+    <string name="ha_url">Server address</string>
+    <string name="ha_token">Access token</string>
+    <string name="ha_works">Connected</string>
+    <string name="ha_refused">The token was refused</string>
+    <string name="ha_failed">Could not reach it: %1$s</string>
     <string name="phone_directions">Directions to %1$s</string>
     <string name="phone_play">Play %1$s</string>
 

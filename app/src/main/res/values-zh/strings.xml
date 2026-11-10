@@ -645,6 +645,12 @@
     <string name="ai_phase_listening">正在聆听“Hey Meta”…</string>
     <string name="ai_phase_thinking">正在思考…</string>
     <string name="ai_phase_speaking">正在通过眼镜说话…</string>
+    <string name="ha_section">Home Assistant</string>
+    <string name="ha_url">服务器地址</string>
+    <string name="ha_token">访问令牌</string>
+    <string name="ha_works">已连接</string>
+    <string name="ha_refused">令牌被拒绝</string>
+    <string name="ha_failed">无法连接：%1$s</string>
     <string name="phone_directions">前往 %1$s 的路线</string>
     <string name="phone_play">播放 %1$s</string>
     <string name="notify_apps_title">应用通知</string>

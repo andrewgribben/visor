@@ -57,6 +57,7 @@ private class Turn(
     val capturePhoto: (suspend () -> ByteArray?)? = null,
     val cameraAction: (suspend (CameraAction) -> Boolean)? = null,
     val apps: List<AppTool> = emptyList(),
+    val locale: Locale = Locale.US,
 ) {
     val remembered = ArrayList<String>()
     val actions = ArrayList<ToolAction>()
@@ -111,6 +112,7 @@ class Brain(
     private val chatGpt: ChatGptPlan,
 ) {
     private val phoneTools = PhoneTools(phone)
+    private val homeAssistant = HomeAssistantTools()
 
     private fun config() = store.config.value
 
@@ -155,12 +157,13 @@ class Brain(
         } catch (_: Exception) {
             Toolbox(emptyList(), "")
         }
-        val turn = Turn(box, image, glasses?.described(), canEnd, capturePhoto, cameraAction, appTools.tools())
+        val turn = Turn(box, image, glasses?.described(), canEnd, capturePhoto, cameraAction, appTools.tools(), locale)
         val system = (if (audience == Audience.PHONE) PHONE_PROMPT else SYSTEM_PROMPT) +
             " It is ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH))}." +
             (if (audience == Audience.GLASSES) " The glasses are set to ${locale.getDisplayLanguage(Locale.ENGLISH)}." else "") +
             memoryPrompt() +
             phoneTools.prompt +
+            (if (c.hasHa) homeAssistant.prompt else "") +
             (if (canEnd) END_PROMPT else "") +
             turn.box.prompt +
             (if ((image != null || capturePhoto != null) && turn.box.tools.isNotEmpty()) PHOTO_PROMPT else "") +
@@ -282,6 +285,10 @@ class Brain(
             action?.let(turn.actions::add)
             return result
         }
+        homeAssistant.run(name, input, config(), turn.locale.language)?.let { (result, action) ->
+            action?.let(turn.actions::add)
+            return result
+        }
         val glasses = turn.glasses
         if (glasses != null) glasses.tools.find { it.short == name }?.let { return glasses.call(it.full, input) }
         turn.box.find(name)?.let { tool ->
@@ -310,6 +317,7 @@ class Brain(
         if (turn.capturePhoto != null) add(Triple(PHOTO_TOOL, PHOTO_HELP, NO_INPUT))
         if (turn.cameraAction != null) cameraTools(c).forEach { add(Triple(it.tool, it.help, NO_INPUT)) }
         addAll(phoneTools.tools)
+        if (c.hasHa) add(homeAssistant.tool)
         turn.box.tools.forEach { add(Triple(it.name, it.help(), it.tool.schema)) }
         turn.glasses?.tools?.forEach { add(Triple(it.short, it.help, it.schema)) }
         // Apps' tools come last, and one named like a tool above stays out: the call would reach the other.
