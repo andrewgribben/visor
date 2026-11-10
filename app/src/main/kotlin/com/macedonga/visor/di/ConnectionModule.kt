@@ -220,7 +220,7 @@ object ConnectionModule {
 
     @Provides
     @Singleton
-    fun timers(@ApplicationContext context: Context): Timers = Timers(File(context.filesDir, "timers.json"))
+    fun timers(@ApplicationContext context: Context): Timers = Timers(File(context.filesDir, "timers.json"), com.macedonga.visor.phone.ClockApp(context))
 
     @Provides
     @Singleton
@@ -287,6 +287,7 @@ object ConnectionModule {
         glassesVoice = { settings.value("assistant_voice_id") },
         liveAiDetailed = { asBool(settings.value("detailed_responses_live_ai_enabled")) },
         hearing = hearing,
+        followUps = { asBool(settings.value("assistant_follow_up_enabled")) },
         processingTimeoutS = { (glassesConfig.state.value.values[PROCESSING_TIMEOUT] as? Number)?.toLong() },
         phone = phone,
         display = { isDisplayBuild(connection.state.value.info?.build) },

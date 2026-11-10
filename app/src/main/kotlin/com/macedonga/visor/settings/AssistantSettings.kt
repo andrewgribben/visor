@@ -44,10 +44,12 @@ import com.macedonga.visor.R
 import com.macedonga.visor.WakeWordKey
 import com.macedonga.visor.features.featureSection
 import com.macedonga.visor.core.assistant.ANSWER_WAITS
+import com.macedonga.visor.core.assistant.AskHandoff
 import com.macedonga.visor.core.assistant.Assistant
 import com.macedonga.visor.core.assistant.AssistantConfigStore
 import com.macedonga.visor.core.assistant.AssistantPhase
 import com.macedonga.visor.core.assistant.ChatGptPlan
+import com.macedonga.visor.core.assistant.DefaultAssistant
 import com.macedonga.visor.core.assistant.HaStatus
 import com.macedonga.visor.core.assistant.haStatus
 import com.macedonga.visor.core.assistant.ModelInfo
@@ -458,6 +460,35 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
                             onClick = { sheet = "ha_token" },
                             value = masked(config.haToken) ?: stringResource(R.string.settings_not_set),
                             sub = sub, problem = problem, busy = haChecking,
+                        )
+                    },
+                    if (config.hasHa) row {
+                        PillsRow(
+                            stringResource(R.string.ai_default_assistant),
+                            listOf(
+                                DefaultAssistant.MODEL to stringResource(R.string.ai_default_assistant_model),
+                                DefaultAssistant.HOME_ASSISTANT to stringResource(R.string.ai_default_assistant_ha),
+                            ),
+                            config.defaultAssistant,
+                            onPick = { a -> model.store.update { it.copy(defaultAssistant = a) } },
+                        )
+                    } else null,
+                )
+            }
+        }
+        item(key = "ask_handoff") {
+            Column {
+                SectionLabel(stringResource(R.string.ai_ask_handoff))
+                Rows(
+                    {
+                        PillsRow(
+                            stringResource(R.string.ai_ask_handoff),
+                            listOf(
+                                AskHandoff.ANSWER_IN_GLASSES to stringResource(R.string.ai_ask_handoff_glasses),
+                                AskHandoff.OPEN_APP to stringResource(R.string.ai_ask_handoff_app),
+                            ),
+                            config.askHandoff,
+                            onPick = { h -> model.store.update { it.copy(askHandoff = h) } },
                         )
                     },
                 )

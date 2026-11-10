@@ -44,6 +44,10 @@ data class AssistantConfig(
     val haUrl: String = "",
     // A long-lived access token from the Home Assistant profile; kept out of backups like the model's key.
     val haToken: String = "",
+    // Who answers a question with no explicit route: the configured model, or Home Assistant's Assist agent first.
+    val defaultAssistant: DefaultAssistant = DefaultAssistant.MODEL,
+    // "ask Claude/ChatGPT/Perplexity ..." by name: answered in the glasses, or opened in that app on the phone.
+    val askHandoff: AskHandoff = AskHandoff.ANSWER_IN_GLASSES,
 ) {
     /** A model can answer: a service needs its key or sign-in, an OpenAI-compatible server may need neither. */
     val hasModel: Boolean get() = when (provider) {
@@ -65,14 +69,17 @@ data class AssistantConfig(
 /** Who says the answer out loud. */
 enum class TtsPath { GLASSES, PHONE, CLOUD }
 
+/** Who answers a question with no explicit route. */
+enum class DefaultAssistant { MODEL, HOME_ASSISTANT }
+
 /** Languages the wearer can speak that the glasses have no pack for, heard and spoken by the phone. */
 val SPEECH_LANGUAGES = listOf(
     "ru-RU", "uk-UA", "pl-PL", "cs-CZ", "ro-RO", "hu-HU", "el-GR", "sv-SE", "da-DK", "nb-NO", "fi-FI",
     "he-IL", "ar-SA", "vi-VN", "id-ID", "th-TH",
 )
 
-/** The waits offered: 20 is the glasses' own; their watchdog ends a turn still processing at 60. */
-val ANSWER_WAITS = listOf(20, 30, 45, 55)
+/** The waits offered: 20 is the glasses' own, shorter ends turns the glasses run themselves sooner; their watchdog ends one still processing at 60. */
+val ANSWER_WAITS = listOf(8, 12, 20, 30, 45, 55)
 
 class AssistantConfigStore(context: Context) {
 
@@ -173,8 +180,27 @@ class AssistantConfigStore(context: Context) {
             .putString("chatgpt", next.chatGpt)
             .putString("ha_url", next.haUrl)
             .putString("ha_token", next.haToken)
+            .putString("default_assistant", next.defaultAssistant.name)
+            .putString("ask_handoff", next.askHandoff.name)
             .apply()
         _config.value = next
+    }
+
+    /**
+     * [p] with the key and model it last answered with: its own, when it is the active provider, else what was kept
+     * for it the last time Visor switched away from it. ChatGPT's sign-in and the subscription need no key. Null
+     * when [p] is not usable now.
+     */
+    fun configFor(p: Provider): AssistantConfig? {
+        val c = _config.value
+        if (c.provider == p) return c.takeIf { it.hasModel }
+        if (p == Provider.CHATGPT) return c.copy(provider = p).takeIf { it.hasModel }
+        if (p == Provider.CLAUDE_SUBSCRIPTION) return c.copy(provider = p)
+        val slots = runCatching { JSONObject(prefs.getString(SLOTS, null) ?: "{}") }.getOrDefault(JSONObject())
+        val slot = slots.optJSONObject(p.name) ?: return null
+        val key = slot.optString("key")
+        if (key.isBlank()) return null
+        return c.copy(provider = p, apiKey = key, model = slot.optString("model"), linesModel = slot.optString("lines"))
     }
 
     private fun load(): AssistantConfig {
@@ -207,6 +233,9 @@ class AssistantConfigStore(context: Context) {
             chatGpt = prefs.getString("chatgpt", d.chatGpt).orEmpty(),
             haUrl = prefs.getString("ha_url", d.haUrl).orEmpty(),
             haToken = prefs.getString("ha_token", d.haToken).orEmpty(),
+            defaultAssistant = prefs.getString("default_assistant", null)
+                ?.let { runCatching { DefaultAssistant.valueOf(it) }.getOrNull() } ?: d.defaultAssistant,
+            askHandoff = prefs.getString("ask_handoff", null)?.let { runCatching { AskHandoff.valueOf(it) }.getOrNull() } ?: d.askHandoff,
         )
     }
 

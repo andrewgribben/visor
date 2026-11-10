@@ -363,6 +363,40 @@ class PhoneActions @Inject constructor(
             sessions.orEmpty().map { it.packageName })
             .filter { it != context.packageName && pm.getLaunchIntentForPackage(it) != null }.toSet()
 
+    override suspend fun openApp(name: String, text: String): PhoneDone {
+        val (pkg, candidates) = findApp(name)
+        if (pkg == null) {
+            return if (candidates.isEmpty()) PhoneDone("", "no app called \"$name\" is on the phone")
+            else PhoneDone("", "more than one app matches \"$name\": ${candidates.joinToString(", ")}", candidates = candidates)
+        }
+        val label = label(pkg)
+        // A shared question (e.g. for another assistant app, which all take a plain-text share); else just the app itself.
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).setPackage(pkg)
+        val intent = if (text.isNotBlank() && pm.queryIntentActivities(send, 0).isNotEmpty()) send else pm.getLaunchIntentForPackage(pkg) ?: send
+        note("Opening $label" + if (text.isNotBlank()) " with the text ready" else "")
+        return open(intent, OPEN_APP_ID, context.getString(R.string.phone_open_app, label), label)
+    }
+
+    /** The one installed launcher app whose label matches [name] best: exact, then containing it or being contained by it. */
+    private fun findApp(name: String): Pair<String?, List<String>> {
+        val want = simple(name)
+        val byLabel = launcherApps().associateWith { simple(label(it)) }
+        val exact = byLabel.filterValues { it == want }.keys
+        if (exact.size == 1) return exact.first() to emptyList()
+        if (exact.size > 1) return null to exact.map(::label).distinct()
+        val partial = byLabel.filterValues { it.isNotEmpty() && (want.contains(it) || it.contains(want)) }.keys
+        return when {
+            partial.isEmpty() -> null to emptyList()
+            partial.size == 1 -> partial.first() to emptyList()
+            else -> null to partial.map(::label).distinct()
+        }
+    }
+
+    /** Every installed app with its own launcher icon, Visor itself left out. */
+    private fun launcherApps(): Set<String> =
+        pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { it.activityInfo.packageName }.filter { it != context.packageName }.toSet()
+
     /** Starts [implicit] when Visor may, and puts it in a notification when it may not or the phone is locked. */
     private fun open(implicit: Intent, id: Int, title: String, named: String): PhoneDone {
         // Explicit, so it opens the app it names and nothing else; with no default, the first that takes it.
@@ -424,6 +458,7 @@ class PhoneActions @Inject constructor(
         const val DIRECTIONS_ID = 11
         const val PLAY_ID = 12
         const val MESSAGE_ID = 13
+        const val OPEN_APP_ID = 14
         const val WHATSAPP_PACKAGE = "com.whatsapp"
         const val LAST = "last_player"
         const val PLAY_WAIT_MS = 6_000L

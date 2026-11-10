@@ -706,6 +706,13 @@
     <string name="ha_failed">Не удалось подключиться: %1$s</string>
     <string name="phone_directions">Маршрут до %1$s</string>
     <string name="phone_play">Воспроизвести %1$s</string>
+    <string name="phone_open_app">Открыть %1$s</string>
+    <string name="ai_default_assistant">Ассистент по умолчанию</string>
+    <string name="ai_default_assistant_model">Модель</string>
+    <string name="ai_default_assistant_ha">Home Assistant</string>
+    <string name="ai_ask_handoff">Когда вы обращаетесь к Claude/ChatGPT/Perplexity по имени</string>
+    <string name="ai_ask_handoff_glasses">Ответ в очках</string>
+    <string name="ai_ask_handoff_app">Открыть приложение</string>
     <string name="phone_message">Сообщение для %1$s</string>
 
     <string name="notify_apps_title">Уведомления приложений</string>

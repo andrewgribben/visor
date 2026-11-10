@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -99,6 +100,8 @@ class ChatGptPlan(context: Context, private val store: AssistantConfigStore) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                // Cancelled by a newer sign-in: closing the listener throws "Socket closed", not a cancellation.
+                ensureActive()
                 val words = e.message ?: e.javaClass.simpleName
                 note("sign-in failed: $words")
                 _signIn.value = SignIn.Failed(Why.OTHER, words)
