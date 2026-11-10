@@ -220,7 +220,7 @@ object ConnectionModule {
 
     @Provides
     @Singleton
-    fun timers(@ApplicationContext context: Context): Timers = Timers(File(context.filesDir, "timers.json"))
+    fun timers(@ApplicationContext context: Context): Timers = Timers(File(context.filesDir, "timers.json"), com.macedonga.visor.phone.ClockApp(context))
 
     @Provides
     @Singleton

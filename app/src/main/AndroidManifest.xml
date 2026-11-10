@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- INTERNET: the Meta login during setup, the glasses' socket on Wi-Fi Direct, and the model, which may be a
          plain-HTTP server on the local network (hence cleartext allowed). -->
     <uses-permission android:name="android.permission.INTERNET" />

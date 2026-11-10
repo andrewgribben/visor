@@ -67,7 +67,13 @@ enum class TarType(val number: Long) {
  * delete and query requests on svc 53210 and wait a few seconds for each answer; after every change the phone sends
  * them the whole list (TARSyncRequest, type 1100), and they ring each one themselves when its time comes.
  */
-class Timers(private val file: File) : Responder {
+/** The phone's own clock app: it rings a timer or alarm itself, whatever the glasses do with theirs. */
+interface PhoneClock {
+    /** True if the clock app took it. */
+    fun set(tar: Tar): Boolean
+}
+
+class Timers(private val file: File, private val clock: PhoneClock? = null) : Responder {
     // Everything kept, oldest first.
     @Volatile
     private var kept: List<Tar> = load()
@@ -85,6 +91,7 @@ class Timers(private val file: File) : Responder {
                 keep(kept.filterNot { it.id == tar.id } + tar)
                 connection.send(reply, result() + Wire.fieldBytes(2, tar.raw), messageType = MT_CREATE + 1)
                 note("Glasses created ${words(tar)}")
+                clock?.let { note(if (it.set(tar)) "The phone's clock rings it too" else "The phone's clock did not take it") }
                 sync(connection, reply)
             }
             MT_UPDATE -> {
