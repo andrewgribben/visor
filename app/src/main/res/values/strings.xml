@@ -604,6 +604,12 @@
     <string name="ai_key">API key</string>
     <string name="ai_provider_other">Other</string>
     <string name="ai_provider_chatgpt_sub">Your Plus or Pro plan</string>
+    <string name="ai_bridge">Bridge</string>
+    <string name="ai_bridge_start">Start</string>
+    <string name="ai_bridge_stop">Stop</string>
+    <string name="ai_bridge_up">Running in Termux.</string>
+    <string name="ai_bridge_down">Not running. Claude answers only while it runs.</string>
+    <string name="ai_provider_claude_sub">Your Pro or Max plan, through Claude Code in Termux</string>
     <string name="ai_provider_openai_sub">API key</string>
     <string name="ai_get_key">Get a key</string>
     <string name="ai_chatgpt_account">ChatGPT account</string>

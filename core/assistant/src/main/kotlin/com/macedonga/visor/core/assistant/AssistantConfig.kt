@@ -43,7 +43,7 @@ data class AssistantConfig(
 ) {
     /** A model can answer: a service needs its key or sign-in, an OpenAI-compatible server may need neither. */
     val hasModel: Boolean get() = when (provider) {
-        Provider.OPENAI_COMPATIBLE -> true
+        Provider.OPENAI_COMPATIBLE, Provider.CLAUDE_SUBSCRIPTION -> true
         Provider.CHATGPT -> chatGpt.isNotEmpty()
         else -> apiKey.isNotBlank()
     }
