@@ -225,7 +225,7 @@ class PhoneMessages @Inject constructor(
     }
 
     /** Sends one text and waits for the radio's word on every part: null when all went, else why not. */
-    private suspend fun deliver(to: String, text: String): String? {
+    internal suspend fun deliver(to: String, text: String): String? {
         val sms = context.getSystemService(SmsManager::class.java)
         val parts = sms.divideMessage(text)
         val action = "${context.packageName}.SMS_SENT.${UUID.randomUUID()}"

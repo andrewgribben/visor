@@ -19,12 +19,19 @@ interface Phone {
     suspend fun control(control: MediaControl): PhoneDone
 
     fun nowPlaying(): NowPlaying
+
+    /** Sends [text] to the contact named [to], as SMS (empty [app] or "sms") or WhatsApp ("whatsapp"). Resolves [to] itself. */
+    suspend fun sendMessage(to: String, text: String, app: String): PhoneDone
+
+    /** Calls the contact named [to], on the phone line (empty [app] or "phone") or WhatsApp ("whatsapp"). Resolves [to] itself. */
+    suspend fun call(to: String, app: String): PhoneDone
 }
 
 /**
  * The app an action used, and why it did not work if it did not. [opened]: the app is open on the phone for it;
  * [tapToOpen]: it waits in a notification. [playing]: what plays now, when known. [gaveUp]: the step that did not work
- * before the app was opened instead, as a clause.
+ * before the app was opened instead, as a clause. [contact]: the name resolved for a message or call, to confirm back
+ * to the wearer. [candidates]: other contacts [to] might have meant, when the name given was ambiguous or not found.
  */
 data class PhoneDone(
     val app: String,
@@ -33,6 +40,8 @@ data class PhoneDone(
     val tapToOpen: Boolean = false,
     val playing: String = "",
     val gaveUp: String = "",
+    val contact: String = "",
+    val candidates: List<String> = emptyList(),
 )
 
 /** What plays on the phone, or [unknown] with the reason nothing is known. */
@@ -55,7 +64,8 @@ internal class PhoneTools(private val phone: Phone) {
 
     val prompt = " You can also act on the wearer's phone: directions opens the route to a place in the map app, play_media " +
         "plays music, podcasts or radio in a phone app, media_control pauses, resumes or skips what plays, now_playing " +
-        "says what plays. Use them whenever the wearer asks for these, without asking first; say it was done only when the " +
+        "says what plays, send_message texts a contact by SMS or WhatsApp, call rings a contact on the phone line or " +
+        "WhatsApp. Use them whenever the wearer asks for these, without asking first; say it was done only when the " +
         "tool says so."
 
     /** Name, description and input schema of each tool. */
@@ -81,6 +91,27 @@ internal class PhoneTools(private val phone: Phone) {
             schema("action" to text("What to do.", *MediaControl.entries.map { it.name.lowercase() }.toTypedArray()), required = "action"),
         ),
         Triple("now_playing", "What plays on the phone now.", schema()),
+        Triple(
+            "send_message",
+            "Send a text message to a contact by name, as SMS or WhatsApp. Confirm the contact's name back in your answer, " +
+                "and say exactly what the tool result says; never say it was sent unless the result says so.",
+            schema(
+                "to" to text("The contact's name, as the wearer said it."),
+                "text" to text("The message to send."),
+                "app" to text("The app to send it in.", "sms", "whatsapp"),
+                required = "to",
+            ),
+        ),
+        Triple(
+            "call",
+            "Call a contact by name, on the phone line or WhatsApp. Confirm the contact's name back in your answer, " +
+                "and say exactly what the tool result says.",
+            schema(
+                "to" to text("The contact's name, as the wearer said it."),
+                "app" to text("The app to call through.", "phone", "whatsapp"),
+                required = "to",
+            ),
+        ),
     )
 
     /** Runs [name] when it is one of these tools: what the model is told, and the diary's line for it. Null for another tool. */
@@ -123,6 +154,32 @@ internal class PhoneTools(private val phone: Phone) {
             val text = now.unknown ?: (if (now.playing) "Playing" else "Paused") + " in ${now.app}: " +
                 now.title.ifEmpty { "an untitled item" } + if (now.artist.isNotEmpty()) " by ${now.artist}" else ""
             ToolResult(text, false) to null
+        }
+        "send_message" -> {
+            val to = input.optString("to").trim()
+            val text = input.optString("text").trim()
+            when {
+                to.isEmpty() -> ToolResult("no recipient named", true) to null
+                text.isEmpty() -> ToolResult("no message text", true) to null
+                else -> phone.sendMessage(to, text, input.optString("app").trim()).let { done ->
+                    told(done) {
+                        when {
+                            it.tapToOpen -> "A message to ${it.contact} waits in a notification; tapping it opens ${it.app} " +
+                                "with the text ready for the wearer to tap Send."
+                            it.opened -> "${it.app} is open on the phone with the message to ${it.contact} ready; the wearer must tap Send there."
+                            else -> "Sent to ${it.contact} on ${it.app}: \"$text\"."
+                        }
+                    } to ToolAction(done.app, "Message · ${done.contact.ifEmpty { to }}", done.failure == null && !done.opened && !done.tapToOpen, kind = "send_message", subject = to)
+                }
+            }
+        }
+        "call" -> {
+            val to = input.optString("to").trim()
+            if (to.isEmpty()) ToolResult("no recipient named", true) to null
+            else phone.call(to, input.optString("app").trim()).let { done ->
+                told(done) { "Calling ${it.contact} on ${it.app}." } to
+                    ToolAction(done.app, "Call · ${done.contact.ifEmpty { to }}", done.failure == null, kind = "call", subject = to)
+            }
         }
         else -> null
     }

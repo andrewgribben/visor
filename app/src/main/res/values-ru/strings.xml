@@ -694,6 +694,7 @@
     <string name="ai_phase_speaking">Говорим через очки…</string>
     <string name="phone_directions">Маршрут до %1$s</string>
     <string name="phone_play">Воспроизвести %1$s</string>
+    <string name="phone_message">Сообщение для %1$s</string>
 
     <string name="notify_apps_title">Уведомления приложений</string>
     <string name="notify_apps_loading">Составляем список приложений…</string>

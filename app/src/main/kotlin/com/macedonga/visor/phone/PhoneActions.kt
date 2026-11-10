@@ -1,5 +1,6 @@
 package com.macedonga.visor.phone
 
+import android.Manifest
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -20,16 +21,22 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.service.media.MediaBrowserService
 import android.support.v4.media.MediaBrowserCompat
 import android.view.KeyEvent
 import com.macedonga.visor.R
+import com.macedonga.visor.connection.PhoneCallControl
+import com.macedonga.visor.connection.PhoneMessages
 import com.macedonga.visor.core.assistant.MediaControl
 import com.macedonga.visor.core.assistant.NowPlaying
 import com.macedonga.visor.core.assistant.Phone
 import com.macedonga.visor.core.assistant.PhoneDone
+import com.macedonga.visor.notify.GlassesNotification
 import com.macedonga.visor.notify.MirrorListener
+import com.macedonga.visor.notify.TextReplies
+import com.macedonga.visor.ui.allows
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,10 +56,17 @@ import kotlinx.coroutines.withTimeoutOrNull
  * The phone's side of directions and music by voice. The map app gets a directions link; the music app is asked through
  * its media session or media browser service, the way the Meta app plays partner music. An app in the background may
  * open another only as a companion app ([companionAssociated]); otherwise, and while the phone is locked, it waits in a
- * notification.
+ * notification. Messages and calls reuse PhoneMessages' SMS delivery and PhoneCallControl's call placing, the same
+ * paths svc70 uses for the glasses' own Messages and Phone apps.
  */
 @Singleton
-class PhoneActions @Inject constructor(@ApplicationContext private val context: Context, private val spotify: SpotifySearch) : Phone {
+class PhoneActions @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val spotify: SpotifySearch,
+    private val messages: PhoneMessages,
+    private val control: PhoneCallControl,
+    private val replies: TextReplies,
+) : Phone {
     private val pm = context.packageManager
     private val listener = ComponentName(context, MirrorListener::class.java)
     private val prefs = context.getSharedPreferences("phone_actions", Context.MODE_PRIVATE)
@@ -159,6 +173,85 @@ class PhoneActions @Inject constructor(@ApplicationContext private val context: 
             (m?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: m?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)).orEmpty(),
             c.playing(),
         )
+    }
+
+    override suspend fun sendMessage(to: String, text: String, app: String): PhoneDone {
+        if (!context.allows(Manifest.permission.READ_CONTACTS)) return PhoneDone("", "Visor may not read contacts")
+        val (found, candidates) = contact(to)
+        if (found == null) return PhoneDone("", contactFailure(to, candidates), candidates = candidates)
+        if (app.trim().lowercase() != "whatsapp") {
+            if (!context.allows(Manifest.permission.SEND_SMS)) return PhoneDone("SMS", "SMS is not allowed in Visor", contact = found.name)
+            note("Sending an SMS to ${found.name}")
+            val error = messages.deliver(found.number, text)
+            note(if (error == null) "Sent to ${found.name}" else "Could not send to ${found.name}: $error")
+            return PhoneDone("SMS", error, contact = found.name)
+        }
+        // A conversation already up on the phone answers through its reply, with no tap needed.
+        replies.findBySender(GlassesNotification.PROVIDER_WHATSAPP, found.name)?.let { (_, action) ->
+            val error = replies.send(context, action, text)
+            note(if (error == null) "Replied to ${found.name} on WhatsApp" else "Could not reply to ${found.name} on WhatsApp: $error")
+            return PhoneDone("WhatsApp", error, contact = found.name)
+        }
+        val digits = found.number.filter { it.isDigit() }
+        if (digits.isEmpty()) return PhoneDone("WhatsApp", "No usable number for ${found.name}", contact = found.name)
+        val link = Uri.parse("https://wa.me/$digits").buildUpon().appendQueryParameter("text", text).build()
+        val intent = Intent(Intent.ACTION_VIEW, link).setPackage(WHATSAPP_PACKAGE)
+        note("Opening WhatsApp on ${found.name} with the text ready")
+        return open(intent, MESSAGE_ID, context.getString(R.string.phone_message, found.name), "WhatsApp").copy(contact = found.name)
+    }
+
+    override suspend fun call(to: String, app: String): PhoneDone {
+        if (!context.allows(Manifest.permission.READ_CONTACTS)) return PhoneDone("", "Visor may not read contacts")
+        val (found, candidates) = contact(to)
+        if (found == null) return PhoneDone("", contactFailure(to, candidates), candidates = candidates)
+        val whatsapp = app.trim().lowercase() == "whatsapp"
+        val provider = if (whatsapp) GlassesNotification.PROVIDER_WHATSAPP else GlassesNotification.PROVIDER_NATIVE
+        val label = if (whatsapp) "WhatsApp" else "the phone"
+        note("Calling ${found.name} on $label")
+        val error = control.startCall(provider, found.number)
+        note(if (error == null) "Calling ${found.name}" else "Could not call ${found.name}: $error")
+        return PhoneDone(label, error, contact = found.name)
+    }
+
+    private class Contact(val name: String, val number: String)
+
+    /** The contact [name] best matches on the phone, with its number, and every distinct name it could also mean. */
+    private fun contact(name: String): Pair<Contact?, List<String>> {
+        val all = contacts()
+        val want = simple(name)
+        val exact = all.filter { simple(it.name) == want }
+        val partial = exact.ifEmpty { all.filter { val n = simple(it.name); want.isNotEmpty() && n.contains(want) } }
+        val names = partial.map { it.name }.distinct()
+        return when {
+            partial.isEmpty() -> null to emptyList()
+            names.size == 1 -> partial.first() to emptyList()
+            else -> null to names
+        }
+    }
+
+    /** The phone's contacts with a number, one per contact (its first number). */
+    private fun contacts(): List<Contact> {
+        val out = mutableListOf<Contact>()
+        val seen = HashSet<Long>()
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+            null, null, null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(0)
+                val dname = c.getString(1)?.takeIf { it.isNotBlank() } ?: continue
+                val number = c.getString(2)?.takeIf { it.isNotBlank() } ?: continue
+                if (seen.add(id)) out += Contact(dname, number)
+            }
+        }
+        return out
+    }
+
+    /** Why [to] could not be resolved to one contact, worded so the model asks the wearer. */
+    private fun contactFailure(to: String, candidates: List<String>): String = when {
+        candidates.isEmpty() -> "no contact called \"$to\" is on the phone; ask the wearer for the right name"
+        else -> "more than one contact matches \"$to\": ${candidates.joinToString(", ")}; ask the wearer which one they mean"
     }
 
     private fun played(pkg: String, label: String, c: MediaController): PhoneDone {
@@ -330,6 +423,8 @@ class PhoneActions @Inject constructor(@ApplicationContext private val context: 
         const val CHANNEL = "assistant_actions"
         const val DIRECTIONS_ID = 11
         const val PLAY_ID = 12
+        const val MESSAGE_ID = 13
+        const val WHATSAPP_PACKAGE = "com.whatsapp"
         const val LAST = "last_player"
         const val PLAY_WAIT_MS = 6_000L
         const val POLL_MS = 250L
