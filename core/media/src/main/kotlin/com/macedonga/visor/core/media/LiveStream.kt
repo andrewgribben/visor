@@ -35,6 +35,11 @@ import com.macedonga.visor.core.session.ServiceData
 import com.macedonga.visor.core.transport.LinkMeter
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.SecureRandom
@@ -814,11 +819,33 @@ class LiveStream(
             }
             say("The glasses joined at ${result.address}:${result.port}")
             if (live) phase(LivePhase.GLASSES)
-            openWifiSession(target, bundle, checkNotNull(result.address), result.port, live = live)
+            val address = checkNotNull(result.address)
+            openWifiSession(target, bundle, address, result.port, groupSockets(address), live = live)
         } catch (unavailable: WifiUnavailable) {
             say("Wi-Fi Direct: ${unavailable.message}")
             if (live) failUnlessRestarting(LiveProblem.JOIN_FAILED)
             false
+        }
+    }
+
+    /**
+     * Sockets bound to the phone's own address on the group. Unbound, a VPN such as Tailscale with an exit node takes
+     * the connect and nothing answers. Null if the group has no address beside [peer].
+     */
+    private fun groupSockets(peer: String): SocketFactory? {
+        val prefix = peer.substringBeforeLast('.') + "."
+        val local = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+            .flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is Inet4Address && it.hostAddress?.startsWith(prefix) == true } ?: return null
+        say("Binding to the group at ${local.hostAddress}")
+        return object : SocketFactory() {
+            override fun createSocket(): Socket = Socket().apply { bind(InetSocketAddress(local, 0)) }
+            override fun createSocket(host: String, port: Int): Socket = getDefault().createSocket(host, port)
+            override fun createSocket(host: String, port: Int, local: InetAddress, localPort: Int): Socket =
+                getDefault().createSocket(host, port, local, localPort)
+            override fun createSocket(host: InetAddress, port: Int): Socket = getDefault().createSocket(host, port)
+            override fun createSocket(host: InetAddress, port: Int, local: InetAddress, localPort: Int): Socket =
+                getDefault().createSocket(host, port, local, localPort)
         }
     }
 
