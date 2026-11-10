@@ -1122,10 +1122,14 @@ class Assistant(
             else -> {
                 // A question that names an app goes to the app, not the model. A partner turn keeps Meta's own flow.
                 val haCommand = if (interaction in l.partnerTurns) null else haRouted(transcript)
-                val claim = if (haCommand != null || interaction in l.partnerTurns) null else apps.claim(transcript)
-                if (haCommand != null) scope.launch { haAnswer(l, interaction, transcript, haCommand) }
-                else if (claim != null) scope.launch { appAnswer(l, interaction, transcript, intent, claim) }
-                else scope.launch { answer(l, interaction, transcript, visual, glasses) }
+                val asked = if (haCommand != null || interaction in l.partnerTurns) null else askRouted(withoutWakeWord(transcript))
+                val claim = if (haCommand != null || asked != null || interaction in l.partnerTurns) null else apps.claim(transcript)
+                when {
+                    haCommand != null -> scope.launch { haAnswer(l, interaction, transcript, haCommand) }
+                    asked != null -> scope.launch { askedAnswer(l, interaction, transcript, visual, glasses, asked) }
+                    claim != null -> scope.launch { appAnswer(l, interaction, transcript, intent, claim) }
+                    else -> scope.launch { defaultAssistantAnswer(l, interaction, transcript, visual, glasses) }
+                }
             }
         }
     }
@@ -1146,6 +1150,11 @@ class Assistant(
         setPhase(l, AssistantPhase.THINKING)
         val c = store.config.value
         val reply = haConverse(c.haUrl, c.haToken, command, spoken(l).language)
+        deliverHaReply(l, interaction, transcript, started, command, reply)
+    }
+
+    /** [reply] from Home Assistant, spoken as [interaction]'s answer; [started] is when it was asked. */
+    private suspend fun deliverHaReply(l: Link, interaction: String, transcript: String, started: Long, command: String, reply: HaReply) {
         val ok = reply.failure == null
         val text = if (ok) reply.text else "Home Assistant did not answer: ${reply.failure}"
         val actions = listOf(ToolAction("Home Assistant", command, ok, kind = "home_assistant", subject = command))
@@ -1156,6 +1165,71 @@ class Assistant(
             update(interaction) { it.copy(sentMs = sentMs) }
         } catch (error: Exception) {
             say("Home Assistant's answer did not reach the glasses: ${error.message}")
+            update(interaction) { it.copy(problem = error.why()) }
+        } finally {
+            setPhase(l, AssistantPhase.LISTENING)
+        }
+    }
+
+    /**
+     * No explicit route: Home Assistant's Assist agent, when it is the default, else the model. If Assist does not
+     * understand the request at all (no_intent_match) the model answers instead, as it would with Assist unset.
+     */
+    private suspend fun defaultAssistantAnswer(l: Link, interaction: String, transcript: String, visual: Visual, glasses: GlassesToolbox?) {
+        val c = store.config.value
+        if (c.defaultAssistant != DefaultAssistant.HOME_ASSISTANT || !c.hasHa || interaction in l.partnerTurns) {
+            return answer(l, interaction, transcript, visual, glasses)
+        }
+        if (!awaitPartnerWake(l, interaction)) return
+        val started = System.currentTimeMillis()
+        val command = withoutWakeWord(transcript).ifBlank { transcript }
+        say("Home Assistant (default) asked for $interaction")
+        setPhase(l, AssistantPhase.THINKING)
+        val reply = haConverse(c.haUrl, c.haToken, command, spoken(l).language)
+        if (reply.failure != null && reply.code == "no_intent_match") {
+            say("Home Assistant did not understand $interaction; the model answers instead")
+            setPhase(l, AssistantPhase.LISTENING)
+            return answer(l, interaction, transcript, visual, glasses)
+        }
+        record(TurnRecord(interaction, started, transcript))
+        deliverHaReply(l, interaction, transcript, started, command, reply)
+    }
+
+    /** [transcript] named [asked] at its start: answered by that provider, or that app opened on the phone. */
+    private suspend fun askedAnswer(l: Link, interaction: String, transcript: String, visual: Visual, glasses: GlassesToolbox?, asked: AskedProvider) {
+        if (asked.appLabel != null && store.config.value.askHandoff == AskHandoff.OPEN_APP) {
+            return openAppAnswer(l, interaction, transcript, asked)
+        }
+        val override = asked.provider?.let { store.configFor(it) }
+        if (override == null) {
+            if (!awaitPartnerWake(l, interaction)) return
+            record(TurnRecord(interaction, System.currentTimeMillis(), transcript))
+            return speakTurn(l, interaction, transcript, "Tell the wearer that ${asked.label} is not set up in Visor.")
+        }
+        answer(l, interaction, transcript, visual, glasses, configOverride = override)
+    }
+
+    /** [asked]'s own app, opened on the phone with the question shared into it, in place of an answer. */
+    private suspend fun openAppAnswer(l: Link, interaction: String, transcript: String, asked: AskedProvider) {
+        if (!awaitPartnerWake(l, interaction)) return
+        val started = System.currentTimeMillis()
+        record(TurnRecord(interaction, started, transcript))
+        say("Opening ${asked.label} on the phone for $interaction")
+        setPhase(l, AssistantPhase.THINKING)
+        val done = phone.openApp(checkNotNull(asked.appLabel), withoutWakeWord(transcript))
+        val text = when {
+            done.failure != null -> "Could not open ${asked.label}: ${done.failure}"
+            done.tapToOpen -> "Tap the notification to open ${asked.label}."
+            else -> "Opening ${asked.label} on your phone."
+        }
+        val actions = listOf(ToolAction(done.app.ifEmpty { asked.label }, "Open · ${asked.label}", done.failure == null, kind = "open_app", subject = asked.label))
+        update(interaction) { it.copy(answer = text, modelMs = System.currentTimeMillis() - started, actions = actions) }
+        try {
+            val sentMs = deliver(l, interaction, transcript, text)
+            l.answered.add(interaction)
+            update(interaction) { it.copy(sentMs = sentMs) }
+        } catch (error: Exception) {
+            say("The answer did not reach the glasses: ${error.message}")
             update(interaction) { it.copy(problem = error.why()) }
         } finally {
             setPhase(l, AssistantPhase.LISTENING)
@@ -1332,6 +1406,8 @@ class Assistant(
     /** [turn] is the diary's turn for it: the interaction's own, or the app's for a question typed there. */
     private suspend fun answer(
         l: Link, interaction: String, transcript: String, visual: Visual, glasses: GlassesToolbox? = null, turn: String = interaction,
+        // "ask Claude ..." for one request: that provider's config instead of the configured one.
+        configOverride: AssistantConfig? = null,
     ) {
         if (!awaitPartnerWake(l, interaction)) return
         val started = System.currentTimeMillis()
@@ -1393,7 +1469,7 @@ class Assistant(
             val left = (budget - (System.currentTimeMillis() - started)).coerceAtLeast(MIN_MODEL_MS)
             withTimeout(left) {
                 brain.answer(transcript, spoken(l), pastOf(turn), image, note, glasses = glasses,
-                    canEnd = interaction !in l.partnerTurns, capturePhoto = capturePhoto, cameraAction = cameraForTurn)
+                    canEnd = interaction !in l.partnerTurns, capturePhoto = capturePhoto, cameraAction = cameraForTurn, configOverride = configOverride)
             }
         } catch (error: Exception) {
             problem = error.why()

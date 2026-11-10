@@ -11,8 +11,11 @@ import org.json.JSONObject
 
 /** Home Assistant's own Assist agent, over its REST API: not MCP, the same conversation a person types into HA. */
 
-/** One answer from Assist: [text] to speak, [conversationId] to continue it, or [failure] when it did not answer. */
-data class HaReply(val text: String, val conversationId: String? = null, val failure: String? = null)
+/**
+ * One answer from Assist: [text] to speak, [conversationId] to continue it, or [failure] when it did not answer,
+ * with Assist's own [code] for it, e.g. "no_intent_match" when it did not understand the request at all.
+ */
+data class HaReply(val text: String, val conversationId: String? = null, val failure: String? = null, val code: String? = null)
 
 /** Whether Home Assistant answers at this address and token, for the settings screen. */
 sealed interface HaStatus {
@@ -36,7 +39,10 @@ suspend fun haConverse(url: String, token: String, text: String, language: Strin
             val newId = answer.optString("conversation_id").ifEmpty { null }
             if (speech == null) {
                 val code = response?.optJSONObject("data")?.optString("code").orEmpty()
-                HaReply("", newId, failure = "no answer from Home Assistant" + code.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
+                HaReply(
+                    "", newId, failure = "no answer from Home Assistant" + code.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty(),
+                    code = code.ifEmpty { null },
+                )
             } else HaReply(speech, newId)
         } catch (error: Exception) {
             HaReply("", null, failure = error.message ?: "Home Assistant did not answer")

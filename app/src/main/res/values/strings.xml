@@ -683,6 +683,13 @@
     <string name="phone_directions">Directions to %1$s</string>
     <string name="phone_play">Play %1$s</string>
     <string name="phone_message">Message to %1$s</string>
+    <string name="phone_open_app">Open %1$s</string>
+    <string name="ai_default_assistant">Default assistant</string>
+    <string name="ai_default_assistant_model">Model</string>
+    <string name="ai_default_assistant_ha">Home Assistant</string>
+    <string name="ai_ask_handoff">When you ask Claude/ChatGPT/Perplexity by name</string>
+    <string name="ai_ask_handoff_glasses">Answer in the glasses</string>
+    <string name="ai_ask_handoff_app">Open the app</string>
 
     <string name="notify_apps_title">App notifications</string>
     <string name="notify_apps_loading">Listing the apps…</string>

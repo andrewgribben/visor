@@ -131,6 +131,8 @@ class Brain(
         canEnd: Boolean = false,
         capturePhoto: (suspend () -> ByteArray?)? = null,
         cameraAction: (suspend (CameraAction) -> Boolean)? = null,
+        // "ask Claude ..." for one answer: that provider's config instead of the one set up, when it is usable.
+        configOverride: AssistantConfig? = null,
     ): Reply = withContext(Dispatchers.IO) {
         // With the camera off only a stop goes without the model; the model answers the rest, its camera tools withheld.
         val keyword = if (cameraAction != null && audience == Audience.GLASSES) {
@@ -148,7 +150,7 @@ class Brain(
             }
             return@withContext Reply(text, actions = turn.actions)
         }
-        val c = ready()
+        val c = ready(configOverride)
         // The tools never stand in the way of an answer: without them the model still answers.
         val box = try {
             hub.toolbox()
@@ -204,8 +206,8 @@ class Brain(
         write(c, c.linesModel.ifBlank { c.model }, system, exchanges, 300)
     }
 
-    private fun ready(): AssistantConfig =
-        config().also { check(it.hasModel) { "no API key is set" } }
+    private fun ready(override: AssistantConfig? = null): AssistantConfig =
+        (override ?: config()).also { check(it.hasModel) { "no API key is set" } }
 
     /** One answer from the provider, through the API that can [search] when asked to. */
     private suspend fun ask(

@@ -659,6 +659,13 @@
     <string name="ha_failed">无法连接：%1$s</string>
     <string name="phone_directions">前往 %1$s 的路线</string>
     <string name="phone_play">播放 %1$s</string>
+    <string name="phone_open_app">打开 %1$s</string>
+    <string name="ai_default_assistant">默认助手</string>
+    <string name="ai_default_assistant_model">模型</string>
+    <string name="ai_default_assistant_ha">Home Assistant</string>
+    <string name="ai_ask_handoff">按名字问 Claude/ChatGPT/Perplexity 时</string>
+    <string name="ai_ask_handoff_glasses">在眼镜中回答</string>
+    <string name="ai_ask_handoff_app">打开应用</string>
     <string name="phone_message">给 %1$s 的消息</string>
     <string name="notify_apps_title">应用通知</string>
     <string name="notify_apps_loading">正在列出应用…</string>

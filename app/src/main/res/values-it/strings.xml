@@ -678,6 +678,13 @@
     <string name="ha_failed">Impossibile raggiungerlo: %1$s</string>
     <string name="phone_directions">Indicazioni per %1$s</string>
     <string name="phone_play">Riproduci %1$s</string>
+    <string name="phone_open_app">Apri %1$s</string>
+    <string name="ai_default_assistant">Assistente predefinito</string>
+    <string name="ai_default_assistant_model">Modello</string>
+    <string name="ai_default_assistant_ha">Home Assistant</string>
+    <string name="ai_ask_handoff">Quando chiedi a Claude/ChatGPT/Perplexity per nome</string>
+    <string name="ai_ask_handoff_glasses">Rispondi negli occhiali</string>
+    <string name="ai_ask_handoff_app">Apri l\'app</string>
     <string name="phone_message">Messaggio a %1$s</string>
 
     <string name="notify_apps_title">Notifiche delle app</string>
