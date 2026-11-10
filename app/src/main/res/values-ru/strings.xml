@@ -698,6 +698,12 @@
     <string name="ai_phase_listening">Слушаем «Hey Meta»…</string>
     <string name="ai_phase_thinking">Думаем…</string>
     <string name="ai_phase_speaking">Говорим через очки…</string>
+    <string name="ha_section">Home Assistant</string>
+    <string name="ha_url">Адрес сервера</string>
+    <string name="ha_token">Токен доступа</string>
+    <string name="ha_works">Подключено</string>
+    <string name="ha_refused">Токен отклонён</string>
+    <string name="ha_failed">Не удалось подключиться: %1$s</string>
     <string name="phone_directions">Маршрут до %1$s</string>
     <string name="phone_play">Воспроизвести %1$s</string>
 

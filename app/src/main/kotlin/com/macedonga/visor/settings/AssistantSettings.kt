@@ -48,6 +48,8 @@ import com.macedonga.visor.core.assistant.Assistant
 import com.macedonga.visor.core.assistant.AssistantConfigStore
 import com.macedonga.visor.core.assistant.AssistantPhase
 import com.macedonga.visor.core.assistant.ChatGptPlan
+import com.macedonga.visor.core.assistant.HaStatus
+import com.macedonga.visor.core.assistant.haStatus
 import com.macedonga.visor.core.assistant.ModelInfo
 import com.macedonga.visor.core.assistant.ModelsError
 import com.macedonga.visor.core.assistant.Provider
@@ -182,6 +184,23 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
         if (plan && config.chatGpt.isNotEmpty() && !noteShown) sheet = "plan_note"
     }
     val noSearch by model.store.noSearch.collectAsStateWithLifecycle()
+
+    // Home Assistant's own Assist agent: GET /api/ proves the address and token, as the model's key check does.
+    var haChecking by remember { mutableStateOf(false) }
+    var haResult by remember { mutableStateOf<HaStatus?>(null) }
+    LaunchedEffect(config.haUrl, config.haToken) {
+        if (!config.hasHa) {
+            haResult = null
+            return@LaunchedEffect
+        }
+        haChecking = true
+        delay(350)
+        haResult = try {
+            haStatus(config.haUrl, config.haToken)
+        } finally {
+            haChecking = false
+        }
+    }
 
     var trial by remember { mutableStateOf("") }
     var trialError by remember { mutableStateOf<String?>(null) }
@@ -422,6 +441,28 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
                 )
             }
         }
+        item(key = "home_assistant") {
+            Column {
+                SectionLabel(stringResource(R.string.ha_section))
+                val (sub, problem) = when (val r = haResult) {
+                    null -> null to null
+                    HaStatus.Works -> stringResource(R.string.ha_works) to null
+                    HaStatus.Refused -> null to stringResource(R.string.ha_refused)
+                    is HaStatus.Failed -> null to stringResource(R.string.ha_failed, r.words)
+                }
+                Rows(
+                    { ValueRow(stringResource(R.string.ha_url), config.haUrl.ifEmpty { stringResource(R.string.settings_not_set) }, onClick = { sheet = "ha_url" }) },
+                    {
+                        RowFrame(
+                            stringResource(R.string.ha_token),
+                            onClick = { sheet = "ha_token" },
+                            value = masked(config.haToken) ?: stringResource(R.string.settings_not_set),
+                            sub = sub, problem = problem, busy = haChecking,
+                        )
+                    },
+                )
+            }
+        }
         item(key = "glasses") {
             Column {
                 SectionLabel(stringResource(R.string.section_on_glasses))
@@ -475,6 +516,15 @@ fun AssistantSettingsScreen(open: (NavKey) -> Unit, model: AssistantViewModel = 
         "url" -> TextSheet(
             stringResource(R.string.ai_base_url), config.baseUrl, onSave = { url -> model.store.update { it.copy(baseUrl = url.trim()) } },
             onDismiss = { sheet = null }, keyboard = KeyboardType.Uri, valid = ::isWebAddress,
+        )
+        "ha_url" -> TextSheet(
+            stringResource(R.string.ha_url), config.haUrl, onSave = { url -> model.store.update { it.copy(haUrl = url.trim()) } },
+            onDismiss = { sheet = null }, keyboard = KeyboardType.Uri, valid = ::isWebAddress, hint = "http://homeassistant.local:8123",
+        )
+        "ha_token" -> TextSheet(
+            stringResource(R.string.ha_token), config.haToken, onSave = { key -> model.store.update { it.copy(haToken = key.trim()) } },
+            onDismiss = { sheet = null }, secret = true, keyboard = KeyboardType.Password,
+            extra = { set -> ActionPill(stringResource(R.string.ai_paste), { paste(context)?.let { set(it.trim()) } }, quiet = true) },
         )
         "instructions" -> TextSheet(
             stringResource(R.string.ai_instructions), config.instructions, onSave = { text -> model.store.update { it.copy(instructions = text) } },

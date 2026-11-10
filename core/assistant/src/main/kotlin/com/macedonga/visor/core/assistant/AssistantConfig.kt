@@ -40,6 +40,10 @@ data class AssistantConfig(
     val answerWaitSeconds: Int = 45,
     // The ChatGPT account signed in for the ChatGPT provider, by its email; empty when signed out.
     val chatGpt: String = "",
+    // Home Assistant's own address, e.g. http://homeassistant.local:8123; its Assist agent answers smart home requests.
+    val haUrl: String = "",
+    // A long-lived access token from the Home Assistant profile; kept out of backups like the model's key.
+    val haToken: String = "",
 ) {
     /** A model can answer: a service needs its key or sign-in, an OpenAI-compatible server may need neither. */
     val hasModel: Boolean get() = when (provider) {
@@ -47,6 +51,9 @@ data class AssistantConfig(
         Provider.CHATGPT -> chatGpt.isNotEmpty()
         else -> apiKey.isNotBlank()
     }
+
+    /** Home Assistant is set up: both the address and a token are in. */
+    val hasHa: Boolean get() = haUrl.isNotBlank() && haToken.isNotBlank()
 
     /** The API address: the service's own, or the one typed in for an OpenAI-compatible server. */
     val api: String get() = if (provider == Provider.OPENAI_COMPATIBLE) baseUrl else provider.api
@@ -164,6 +171,8 @@ class AssistantConfigStore(context: Context) {
             .putInt("memory_minutes", next.memoryMinutes)
             .putInt("answer_wait_s", next.answerWaitSeconds)
             .putString("chatgpt", next.chatGpt)
+            .putString("ha_url", next.haUrl)
+            .putString("ha_token", next.haToken)
             .apply()
         _config.value = next
     }
@@ -196,6 +205,8 @@ class AssistantConfigStore(context: Context) {
             memoryMinutes = prefs.getInt("memory_minutes", d.memoryMinutes),
             answerWaitSeconds = prefs.getInt("answer_wait_s", d.answerWaitSeconds),
             chatGpt = prefs.getString("chatgpt", d.chatGpt).orEmpty(),
+            haUrl = prefs.getString("ha_url", d.haUrl).orEmpty(),
+            haToken = prefs.getString("ha_token", d.haToken).orEmpty(),
         )
     }
 
