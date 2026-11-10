@@ -678,6 +678,7 @@
     <string name="ha_failed">Impossibile raggiungerlo: %1$s</string>
     <string name="phone_directions">Indicazioni per %1$s</string>
     <string name="phone_play">Riproduci %1$s</string>
+    <string name="phone_message">Messaggio a %1$s</string>
 
     <string name="notify_apps_title">Notifiche delle app</string>
     <string name="notify_apps_loading">Elenco le app…</string>

@@ -255,7 +255,7 @@ class MirrorListener : NotificationListenerService(), Messaging {
         val number = if (native) numberOf(person, sender) else null
         // The thread the glasses answer with (FoA 2) names the notification's reply action, for every provider.
         val threadId = threadOf(sbn, number, group)
-        replyAction(sbn.notification)?.let { textReplies.put(threadId, sbn.key, it) }
+        replyAction(sbn.notification)?.let { textReplies.put(threadId, sbn.key, it, provider, sender) }
         return GlassesNotification(
             key = sbn.key,
             pkg = APP_IDS[provider] ?: sbn.packageName,

@@ -682,6 +682,7 @@
     <string name="ha_failed">Could not reach it: %1$s</string>
     <string name="phone_directions">Directions to %1$s</string>
     <string name="phone_play">Play %1$s</string>
+    <string name="phone_message">Message to %1$s</string>
 
     <string name="notify_apps_title">App notifications</string>
     <string name="notify_apps_loading">Listing the apps…</string>

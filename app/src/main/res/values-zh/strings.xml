@@ -659,6 +659,7 @@
     <string name="ha_failed">无法连接：%1$s</string>
     <string name="phone_directions">前往 %1$s 的路线</string>
     <string name="phone_play">播放 %1$s</string>
+    <string name="phone_message">给 %1$s 的消息</string>
     <string name="notify_apps_title">应用通知</string>
     <string name="notify_apps_loading">正在列出应用…</string>
     <string name="notify_apps_all_on">全部允许</string>
