@@ -37,13 +37,11 @@ suspend fun haConverse(url: String, token: String, text: String, language: Strin
             val response = answer.optJSONObject("response")
             val speech = response?.optJSONObject("speech")?.optJSONObject("plain")?.optString("speech")?.ifBlank { null }
             val newId = answer.optString("conversation_id").ifEmpty { null }
+            // An error answer still carries speech ("Sorry, I couldn't understand that"); its code says which error.
+            val code = response?.takeIf { it.optString("response_type") == "error" }?.optJSONObject("data")?.optString("code")?.ifEmpty { null }
             if (speech == null) {
-                val code = response?.optJSONObject("data")?.optString("code").orEmpty()
-                HaReply(
-                    "", newId, failure = "no answer from Home Assistant" + code.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty(),
-                    code = code.ifEmpty { null },
-                )
-            } else HaReply(speech, newId)
+                HaReply("", newId, failure = "no answer from Home Assistant" + code?.let { " ($it)" }.orEmpty(), code = code)
+            } else HaReply(speech, newId, code = code)
         } catch (error: Exception) {
             HaReply("", null, failure = error.message ?: "Home Assistant did not answer")
         }

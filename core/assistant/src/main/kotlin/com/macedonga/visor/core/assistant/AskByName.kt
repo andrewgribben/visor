@@ -33,3 +33,6 @@ private val ASK_ROUTE = Regex(
 
 /** The provider or app [transcript] (with its wake word already gone) names at its start, or null for none. */
 fun askRouted(transcript: String): AskedProvider? = ASK_ROUTE.find(transcript)?.let { ASKABLE[it.groupValues[1].lowercase()] }
+
+/** [transcript] without its "ask <name> (to)" start, i.e. the question itself. */
+fun askedQuestion(transcript: String): String = ASK_ROUTE.find(transcript)?.let { transcript.substring(it.range.last + 1).trim() } ?: transcript

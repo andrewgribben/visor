@@ -1186,7 +1186,7 @@ class Assistant(
         say("Home Assistant (default) asked for $interaction")
         setPhase(l, AssistantPhase.THINKING)
         val reply = haConverse(c.haUrl, c.haToken, command, spoken(l).language)
-        if (reply.failure != null && reply.code == "no_intent_match") {
+        if (reply.code == "no_intent_match") {
             say("Home Assistant did not understand $interaction; the model answers instead")
             setPhase(l, AssistantPhase.LISTENING)
             return answer(l, interaction, transcript, visual, glasses)
@@ -1216,7 +1216,7 @@ class Assistant(
         record(TurnRecord(interaction, started, transcript))
         say("Opening ${asked.label} on the phone for $interaction")
         setPhase(l, AssistantPhase.THINKING)
-        val done = phone.openApp(checkNotNull(asked.appLabel), withoutWakeWord(transcript))
+        val done = phone.openApp(checkNotNull(asked.appLabel), askedQuestion(withoutWakeWord(transcript)))
         val text = when {
             done.failure != null -> "Could not open ${asked.label}: ${done.failure}"
             done.tapToOpen -> "Tap the notification to open ${asked.label}."
