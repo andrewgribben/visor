@@ -25,6 +25,9 @@ interface Phone {
 
     /** Calls the contact named [to], on the phone line (empty [app] or "phone") or WhatsApp ("whatsapp"). Resolves [to] itself. */
     suspend fun call(to: String, app: String): PhoneDone
+
+    /** Opens the app named [name] (its label on the phone), sharing [text] into it (as a plain-text share) when given. */
+    suspend fun openApp(name: String, text: String = ""): PhoneDone
 }
 
 /**
@@ -65,8 +68,8 @@ internal class PhoneTools(private val phone: Phone) {
     val prompt = " You can also act on the wearer's phone: directions opens the route to a place in the map app, play_media " +
         "plays music, podcasts or radio in a phone app, media_control pauses, resumes or skips what plays, now_playing " +
         "says what plays, send_message texts a contact by SMS or WhatsApp, call rings a contact on the phone line or " +
-        "WhatsApp. Use them whenever the wearer asks for these, without asking first; say it was done only when the " +
-        "tool says so."
+        "WhatsApp, open_app opens any other named app, sharing text into it when asked. Use them whenever the wearer " +
+        "asks for these, without asking first; say it was done only when the tool says so."
 
     /** Name, description and input schema of each tool. */
     val tools: List<Triple<String, String, JSONObject>> = listOf(
@@ -110,6 +113,17 @@ internal class PhoneTools(private val phone: Phone) {
                 "to" to text("The contact's name, as the wearer said it."),
                 "app" to text("The app to call through.", "phone", "whatsapp"),
                 required = "to",
+            ),
+        ),
+        Triple(
+            "open_app",
+            "Open an app on the phone by its name, such as another assistant app, optionally sharing text into it " +
+                "(e.g. the wearer's question, for an app that takes a shared question). Opens it on the phone when " +
+                "Visor may and the phone is unlocked, else a notification waits for a tap. Say exactly what the tool result says.",
+            schema(
+                "name" to text("The app's name, as installed on the phone, e.g. \"Claude\" or \"Spotify\"."),
+                "text" to text("Text to share into the app; empty just opens it."),
+                required = "name",
             ),
         ),
     )
@@ -179,6 +193,16 @@ internal class PhoneTools(private val phone: Phone) {
             else phone.call(to, input.optString("app").trim()).let { done ->
                 told(done) { "Calling ${it.contact} on ${it.app}." } to
                     ToolAction(done.app, "Call · ${done.contact.ifEmpty { to }}", done.failure == null, kind = "call", subject = to)
+            }
+        }
+        "open_app" -> {
+            val name = input.optString("name").trim()
+            if (name.isEmpty()) ToolResult("no app named", true) to null
+            else phone.openApp(name, input.optString("text").trim()).let { done ->
+                told(done) {
+                    if (it.tapToOpen) "${it.app} waits in a notification on the phone; tapping it opens it."
+                    else "${it.app} is open on the phone."
+                } to ToolAction(done.app.ifEmpty { name }, "Open · ${done.app.ifEmpty { name }}", done.failure == null && !done.tapToOpen, kind = "open_app", subject = name)
             }
         }
         else -> null
