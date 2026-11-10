@@ -1173,7 +1173,7 @@ class Assistant(
 
     /**
      * No explicit route: Home Assistant's Assist agent, when it is the default, else the model. If Assist does not
-     * understand the request at all (no_intent_match) the model answers instead, as it would with Assist unset.
+     * answers with an error (did not understand, no such device) the model answers instead, with its home_assistant tool.
      */
     private suspend fun defaultAssistantAnswer(l: Link, interaction: String, transcript: String, visual: Visual, glasses: GlassesToolbox?) {
         val c = store.config.value
@@ -1186,8 +1186,10 @@ class Assistant(
         say("Home Assistant (default) asked for $interaction")
         setPhase(l, AssistantPhase.THINKING)
         val reply = haConverse(c.haUrl, c.haToken, command, spoken(l).language)
-        if (reply.code == "no_intent_match") {
-            say("Home Assistant did not understand $interaction; the model answers instead")
+        say("Home Assistant answered ${reply.type ?: "-"}/${reply.code ?: "-"} for $interaction")
+        // Any Assist error ("couldn't understand", no such device): the model retries, with its home_assistant tool.
+        if (reply.code != null) {
+            say("Home Assistant answered ${reply.code} for $interaction; the model answers instead")
             setPhase(l, AssistantPhase.LISTENING)
             return answer(l, interaction, transcript, visual, glasses)
         }
