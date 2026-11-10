@@ -84,6 +84,8 @@ class Assistant(
     private val liveAiDetailed: () -> Boolean,
     /** Conversation focus, which the phone starts when the wearer asks for it by voice. */
     private val hearing: Hearing,
+    /** The wearer's "Respond without Hey Meta" (assistant_follow_up_enabled): off, no answer keeps the mic open. */
+    private val followUps: () -> Boolean,
     /** How long the glasses wait for an answer (assistant_on_sn.default_processing_timeout_s), when known. */
     private val processingTimeoutS: () -> Long?,
     /** The phone's player, for pausing, resuming and skipping by voice. */
@@ -1788,7 +1790,7 @@ class Assistant(
     private fun voiceComplete(interaction: String, text: String, listen: Boolean, card: String?, streamed: Boolean = false) = netEvent(
         EV_MWA_VOICE_INTERACTION_COMPLETE,
         interactionComplete(
-            interaction, text, expectsAnswer = listen && ASKS.containsMatchIn(text), followUp = listen && text.isNotEmpty(), card = card,
+            interaction, text, expectsAnswer = listen && ASKS.containsMatchIn(text), followUp = listen && followUps() && text.isNotEmpty(), card = card,
             streamed = streamed,
         ),
     )
