@@ -78,8 +78,8 @@ val SPEECH_LANGUAGES = listOf(
     "he-IL", "ar-SA", "vi-VN", "id-ID", "th-TH",
 )
 
-/** The waits offered: 20 is the glasses' own; their watchdog ends a turn still processing at 60. */
-val ANSWER_WAITS = listOf(20, 30, 45, 55)
+/** The waits offered: 20 is the glasses' own, shorter ends turns the glasses run themselves sooner; their watchdog ends one still processing at 60. */
+val ANSWER_WAITS = listOf(8, 12, 20, 30, 45, 55)
 
 class AssistantConfigStore(context: Context) {
 
