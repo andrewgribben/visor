@@ -25,14 +25,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** One conversation as a day shows it: its turns of that day, in order. [startedOn] is set when it began on an earlier day. */
+/** One conversation as a day shows it: its turns of that day, newest first. [startedOn] is set when it began on an earlier day. */
 data class DiaryConversation(val id: String, val turns: List<TurnRecord>, val live: Boolean, val startedOn: LocalDate?)
 
 /** One day: its lines, and its conversations, newest first. */
 data class DiaryDay(val date: LocalDate, val lines: DayLines?, val conversations: List<DiaryConversation>) {
     val questions: Int get() = conversations.sumOf { it.turns.size }
     /** The photos the glasses took for its questions, in order; Live AI's frames stay in its block. */
-    val photos: List<TurnRecord> get() = conversations.filterNot { it.live }.flatMap { it.turns }.filter { it.image.isNotEmpty() }.sortedBy { it.at }
+    val photos: List<TurnRecord> get() = conversations.filterNot { it.live }.flatMap { it.turns }.filter { it.image.isNotEmpty() }.sortedByDescending { it.at }
 }
 
 @HiltViewModel
@@ -134,8 +134,8 @@ class MetaAiModel @Inject constructor(
             for (t in turns) firstDay.putIfAbsent(t.conversation, t.date)
             return turns.groupBy { it.date }.toSortedMap(reverseOrder()).map { (date, list) ->
                 val conversations = list.groupBy { it.conversation.ifEmpty { it.interactionId } }
-                    .map { (id, ts) -> DiaryConversation(id, ts, ts.first().source == TurnSource.LIVE_AI, firstDay[id]?.takeIf { it != date }) }
-                    .sortedByDescending { it.turns.last().at }
+                    .map { (id, ts) -> DiaryConversation(id, ts.asReversed(), ts.first().source == TurnSource.LIVE_AI, firstDay[id]?.takeIf { it != date }) }
+                    .sortedByDescending { it.turns.first().at }
                 DiaryDay(date, lines[date], conversations)
             }
         }

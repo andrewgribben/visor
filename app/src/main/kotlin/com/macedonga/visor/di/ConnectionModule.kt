@@ -80,6 +80,7 @@ import com.macedonga.visor.language.PROCESSING_TIMEOUT
 import com.macedonga.visor.metaai.AssistantCamera
 import com.macedonga.visor.notify.GlassesNotification
 import com.macedonga.visor.notify.NotifyIcons
+import com.macedonga.visor.pairs.pairPrefs
 import com.macedonga.visor.phone.PhoneActions
 import com.macedonga.visor.outside.KitTools
 import com.macedonga.visor.outside.KitVoices
@@ -293,6 +294,7 @@ object ConnectionModule {
         display = { isDisplayBuild(connection.state.value.info?.build) },
         cameraAction = camera::act,
         apps = kitVoices,
+        wakeWordPhrase = { pairPrefs(context, "wake_word", connection.pair.value).getString("enrolled", null) },
     )
 
     @Provides
