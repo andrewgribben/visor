@@ -95,6 +95,8 @@ class Assistant(
     private val cameraAction: suspend (CameraAction) -> Boolean,
     /** Apps that answer the questions naming them, through the VDK. */
     private val apps: AppVoices,
+    /** The custom wake word enrolled for the current pair (WakeWordModel's "enrolled"), when there is one. */
+    private val wakeWordPhrase: () -> String? = { null },
 ) : Responder {
 
     // A send on a channel the glasses closed, or after the link went, throws: it is logged, not a crash.
@@ -334,8 +336,15 @@ class Assistant(
         }
     }
 
-    /** [text] without a wake phrase at its start, such as "Hey Meta," or "Хей, мета". */
-    private fun withoutWakeWord(text: String): String = text.trim().replace(WAKE_WORD_START, "").trim()
+    /** [text] without a wake phrase at its start, such as "Hey Meta," or "Хей, мета", or the enrolled custom one ("Hey Edith"). */
+    private fun withoutWakeWord(text: String): String {
+        val trimmed = text.trim()
+        val custom = wakeWordPhrase()?.trim()?.takeIf { it.isNotEmpty() } ?: return trimmed.replace(WAKE_WORD_START, "").trim()
+        // The enrolled phrase may itself start with a greeting ("Hey Edith"); strip that first so both forms match.
+        val bare = custom.replace(GREETING_PREFIX, "")
+        val customStart = Regex("^(hey|hi|ok|okay)?[ ,]*${Regex.escape(bare)}[ ,.!?]+", RegexOption.IGNORE_CASE)
+        return trimmed.replace(customStart, "").replace(WAKE_WORD_START, "").trim()
+    }
 
     /** svc15 state for one Bluetooth session. */
     private inner class Link(val mux: DataXConnection) {
@@ -2007,6 +2016,8 @@ class Assistant(
             "^((hey|hi|ehi|ei|ok|okay)?[ ,]*(meta|mata|metta|matta|meda)|(хей|хэй|хай|эй)([ ,]+(мета|мэта|метта|мэтта|это|вета))?|мета|мэта|метта|мэтта|вета|всем[ ,]+это)[.!?]*$",
             RegexOption.IGNORE_CASE,
         )
+        // A greeting ("Hey ", "Ok ") at the start of the enrolled custom phrase, stripped so "Hey Edith" and "Edith" both match.
+        val GREETING_PREFIX = Regex("^(hey|hi|ok|okay)[ ,]+", RegexOption.IGNORE_CASE)
         // A wake phrase at the start of a question, with the punctuation after it.
         val WAKE_WORD_START = Regex(
             "^((hey|hi|ehi|ei|ok|okay)?[ ,]*(meta|mata|metta|matta|meda)|(хей|хэй|хай|эй)([ ,]+(мета|мэта|метта|мэтта|это|вета))?|мета|мэта|метта|мэтта|вета|всем[ ,]+это)[ ,.!?]+",
