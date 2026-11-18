@@ -48,7 +48,8 @@ fun LiveSessionScreen(conversation: String, onMemories: () -> Unit, model: MetaA
         val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = top + BAR, bottom = 40.dp)) {
             item(key = "head") {
-                turns.firstOrNull()?.let {
+                // When the session began: its oldest turn, now last.
+                turns.lastOrNull()?.let {
                     Text(dayTitle(it.date) + ", " + clockTime(it.at), style = Visor.type.body, color = colors.textSecondary, modifier = Modifier.padding(horizontal = SIDE).padding(top = 6.dp, bottom = 24.dp))
                 }
             }
