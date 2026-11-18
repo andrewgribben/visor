@@ -41,7 +41,7 @@ import com.macedonga.visor.settings.TopBar
 fun LiveSessionScreen(conversation: String, onMemories: () -> Unit, model: MetaAiModel = hiltViewModel()) {
     val colors = Visor.colors
     val all by model.turns.collectAsStateWithLifecycle()
-    val turns = remember(all, conversation) { all.filter { it.conversation == conversation } }
+    val turns = remember(all, conversation) { all.filter { it.conversation == conversation }.asReversed() }
     var viewing by rememberSaveable { mutableStateOf<String?>(null) }
     val list = rememberLazyListState()
     Box(Modifier.fillMaxSize().background(colors.canvas)) {

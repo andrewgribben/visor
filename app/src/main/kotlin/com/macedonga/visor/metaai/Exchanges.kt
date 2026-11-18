@@ -338,9 +338,9 @@ private fun Thinking() {
 internal fun LiveBlock(conversation: DiaryConversation, onOpen: () -> Unit, onActions: () -> Unit) {
     val colors = Visor.colors
     val turns = conversation.turns
-    val first = turns.first()
-    val last = turns.last()
-    val minutes = ceil((last.at + last.modelMs + SPOKEN_TAIL_MS - first.at) / 60_000.0).toInt().coerceAtLeast(1)
+    val newest = turns.first()
+    val oldest = turns.last()
+    val minutes = ceil((newest.at + newest.modelMs + SPOKEN_TAIL_MS - oldest.at) / 60_000.0).toInt().coerceAtLeast(1)
     Column(
         Modifier
             .padding(horizontal = 16.dp, vertical = 14.dp)
@@ -358,7 +358,7 @@ internal fun LiveBlock(conversation: DiaryConversation, onOpen: () -> Unit, onAc
                 color = colors.textPrimary,
                 modifier = Modifier.padding(start = 8.dp).weight(1f),
             )
-            Text(clockTime(first.at), style = Visor.type.label, color = colors.textSecondary)
+            Text(clockTime(oldest.at), style = Visor.type.label, color = colors.textSecondary)
         }
         val frames = turns.filter { it.image.isNotEmpty() }.take(5)
         if (frames.isNotEmpty()) {
