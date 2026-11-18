@@ -4,8 +4,16 @@ import com.macedonga.visor.core.assistant.mcp.ToolAction
 import com.macedonga.visor.core.assistant.mcp.ToolResult
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -32,6 +40,7 @@ suspend fun haConverse(url: String, token: String, text: String, language: Strin
     withContext(Dispatchers.IO) {
         val body = JSONObject().put("text", text).put("language", language.ifBlank { "en" })
         conversationId?.let { body.put("conversation_id", it) }
+        preferredAgentId(url, token)?.let { body.put("agent_id", it) }
         try {
             val answer = haPost("${url.trimEnd('/')}/api/conversation/process", token, body)
             val response = answer.optJSONObject("response")
@@ -85,6 +94,83 @@ private fun haPost(url: String, token: String, body: JSONObject): JSONObject {
         return JSONObject(text)
     } finally {
         http.disconnect()
+    }
+}
+
+// The preferred Assist pipeline's agent, by (url, token): HA's built-in agent ignores the pipeline the person
+// chose in Settings > Voice assistants, so without this a Claude/OpenAI pipeline never sees the request. A failed
+// discovery is retried after a few minutes rather than every call, so one offline moment doesn't cost 5s each turn.
+private data class AgentCacheEntry(val agentId: String?, val atMs: Long, val failed: Boolean)
+private val agentCache = mutableMapOf<String, AgentCacheEntry>()
+private const val AGENT_FAIL_RETRY_MS = 3 * 60_000L
+private val haWsClient by lazy {
+    OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(5, TimeUnit.SECONDS).build()
+}
+
+/** The preferred pipeline's conversation_engine (its agent_id), cached per (url, token); null when unknown. */
+private suspend fun preferredAgentId(url: String, token: String): String? {
+    val key = "$url|$token"
+    val cached = agentCache[key]
+    val stale = cached == null || (cached.failed && System.currentTimeMillis() - cached.atMs > AGENT_FAIL_RETRY_MS)
+    if (!stale) return cached?.agentId
+    val agentId = withTimeoutOrNull(5_000) { runCatching { discoverPreferredAgentId(url, token) }.getOrNull() }
+    agentCache[key] = AgentCacheEntry(agentId, System.currentTimeMillis(), failed = agentId == null)
+    return agentId
+}
+
+/** ws(s)://<host>/api/websocket for the http(s) [url], keeping any path prefix. */
+private fun haWsUrl(url: String): String {
+    val trimmed = url.trimEnd('/')
+    val swapped = when {
+        trimmed.startsWith("https://") -> "wss://" + trimmed.removePrefix("https://")
+        trimmed.startsWith("http://") -> "ws://" + trimmed.removePrefix("http://")
+        else -> trimmed
+    }
+    return "$swapped/api/websocket"
+}
+
+/**
+ * Asks Home Assistant's websocket API for assist_pipeline/pipeline/list and returns the preferred pipeline's
+ * conversation_engine (e.g. "conversation.claude"), or null when it could not be found. Never throws.
+ */
+private suspend fun discoverPreferredAgentId(url: String, token: String): String? {
+    val result = CompletableDeferred<String?>()
+    val socket = haWsClient.newWebSocket(
+        Request.Builder().url(haWsUrl(url)).build(),
+        object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val msg = runCatching { JSONObject(text) }.getOrNull() ?: return
+                when (msg.optString("type")) {
+                    "auth_required" -> webSocket.send(JSONObject().put("type", "auth").put("access_token", token).toString())
+                    "auth_ok" -> webSocket.send(JSONObject().put("id", 1).put("type", "assist_pipeline/pipeline/list").toString())
+                    "auth_invalid" -> result.complete(null)
+                    "result" -> {
+                        if (msg.optInt("id") == 1) {
+                            val listResult = msg.optJSONObject("result")
+                            val preferredId = listResult?.optString("preferred_pipeline")
+                            val pipelines = listResult?.optJSONArray("pipelines") ?: JSONArray()
+                            val preferred = (0 until pipelines.length()).map { pipelines.getJSONObject(it) }
+                                .firstOrNull { it.optString("id") == preferredId }
+                            result.complete(preferred?.optString("conversation_engine")?.ifBlank { null })
+                        }
+                    }
+                }
+                if (result.isCompleted) webSocket.close(1000, null)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (!result.isCompleted) result.complete(null)
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (!result.isCompleted) result.complete(null)
+            }
+        },
+    )
+    return try {
+        result.await()
+    } finally {
+        socket.cancel()
     }
 }
 
