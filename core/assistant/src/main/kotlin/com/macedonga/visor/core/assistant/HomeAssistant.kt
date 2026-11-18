@@ -101,7 +101,7 @@ private fun haPost(url: String, token: String, body: JSONObject): JSONObject {
 // chose in Settings > Voice assistants, so without this a Claude/OpenAI pipeline never sees the request. A failed
 // discovery is retried after a few minutes rather than every call, so one offline moment doesn't cost 5s each turn.
 private data class AgentCacheEntry(val agentId: String?, val atMs: Long, val failed: Boolean)
-private val agentCache = mutableMapOf<String, AgentCacheEntry>()
+private val agentCache = java.util.concurrent.ConcurrentHashMap<String, AgentCacheEntry>()
 private const val AGENT_FAIL_RETRY_MS = 3 * 60_000L
 private val haWsClient by lazy {
     OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(5, TimeUnit.SECONDS).build()
